@@ -6,10 +6,6 @@ resource "proxmox_virtual_environment_download_file" "debian_12_bookworm_img" {
   url                = "https://cloud.debian.org/images/cloud/bookworm/20240102-1614/debian-12-genericcloud-amd64-20240102-1614.qcow2"
   checksum           = "49cbcfdb3d5401e8c731d33211cff5e1ef884f179a936c7378eeab00c582ace45dd7154ac9e4c059f1bd6c7ae2ce805879cb381a12a1cc493e3a58c847e134c7"
   checksum_algorithm = "sha512"
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 data "local_file" "user_ssh_pubkey" {
@@ -33,6 +29,12 @@ runcmd:
   - systemctl --quiet is-enabled systemd-networkd && systemctl restart systemd-networkd
 EOF
     file_name = "vendor.cloud-config.yaml"
+  }
+
+  lifecycle {
+    ignore_changes = [
+      datastore_id,
+    ]
   }
 }
 
@@ -58,8 +60,13 @@ resource "proxmox_virtual_environment_vm" "cluster" {
 
   migrate = true
 
+  vga {
+    enabled = true
+    type    = "serial0"
+  }
+
   memory {
-    dedicated = 4096
+    dedicated = 8192
   }
 
   disk {
@@ -91,6 +98,15 @@ resource "proxmox_virtual_environment_vm" "cluster" {
   }
 
   serial_device {}
+
+  lifecycle {
+    ignore_changes = [
+      node_name,
+      vga["memory"],
+      disk["size"],
+      started,
+    ]
+  }
 }
 
 resource "tls_private_key" "provision" {
